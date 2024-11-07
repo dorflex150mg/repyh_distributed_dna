@@ -2,7 +2,7 @@ use uuid::Uuid;
 use serde::{Serialize, Deserialize};
 use std::fmt::{self, Display};
 
-#[derive(Serialize)]
+#[derive(Serialize, Deserialize, Clone)]
 pub struct DnaSequence {
     pub id: String,
     pub dna_sequence: String,

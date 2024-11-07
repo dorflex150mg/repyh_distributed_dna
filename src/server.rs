@@ -24,6 +24,7 @@ pub mod server {
         let mut loc_buffer: [u8; 2048] = [0; 2048];
         let _ = stream.read(&mut loc_buffer);
         let new_string = from_utf8(&loc_buffer).unwrap();
+        
         *buffer.lock().unwrap() = new_string.to_owned();
         buffer
     }

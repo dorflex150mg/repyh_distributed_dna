@@ -1,6 +1,8 @@
 pub mod node;
 pub mod user;
 pub mod server;
+pub mod sender;
+pub mod responses;
 
 use crate::node::node::Node;
 use crate::user::user::User;
@@ -16,7 +18,7 @@ use actix_rt;
 use serde::{Serialize, Deserialize};
 
 use crate::repository::db::DbHandle;
-//use crate::api::item::get_item;
+use crate::responses::responses::Responses;
 use tracing::{debug, info};
 
 mod api;
@@ -26,7 +28,7 @@ mod model;
 
 use api::dna_sequence::{
     create_dna_sequence,
-    get_dna_sequences,
+    get_dna_sequence,
 };
 
 
@@ -49,19 +51,22 @@ async fn  main() -> Result<(), Box<dyn Error>> {
     let api_ip = ip_list[1].clone();
     let peers = json[1].clone();
     // Initializing a node
-    tokio::spawn(async move {
-        let node = Node::new(ip, peers).await.unwrap();
-        let user = User::new();
-        info!("server id: {}, node id: {}", node.server.id, node.server.id);
-        info!("user id: {}", user.id);
-    });
+    //let node = Node::new(ip, peers).await.unwrap();
+    let responses: HashMap<String, Responses> = HashMap::new();
+    let addresses_arc = Arc::new(Mutex::new(peers));
+    let responses_arc = Arc::new(Mutex::new(responses));
+
 
     // Creating client-side service
     let db: Db = Arc::new(Mutex::new(DbHandle::new(String::from("dna.db")).unwrap()));
     let _ = HttpServer::new(move || { 
         let db_handle = web::Data::new(db.clone()); //a struct that represents data
+        let addresses_data = web::Data::new(addresses_arc.clone()); 
+        let responses_data = web::Data::new(responses_arc.clone());
         App::new()
-            .service(get_dna_sequences)
+            .service(get_dna_sequence)
+            .app_data(addresses_data)
+            .app_data(responses_data)
             .app_data(db_handle) //enrolls data "type" into the app
     })
         .bind(api_ip)?

@@ -13,7 +13,8 @@ pub mod node {
         pub id: Uuid,
         pub key_pair: EcdsaKeyPair,
         rng: SystemRandom,
-        pub server: Server,
+        pub peers: Vec<String>,
+
     }
 
     fn generate_key_pair() -> (EcdsaKeyPair, SystemRandom) {
@@ -26,18 +27,13 @@ pub mod node {
 
 
     impl Node {
-        pub async fn new(ip: impl Into<String>, peers: Vec<String>) -> Result<Self, Box<dyn Error>> {
+        pub async fn new(ip: impl Into<String>, peers: Vec<String>)-> Result<Self, Box<dyn Error>> {
             let (key_pair, rng) = generate_key_pair();
-            let buffer = String::new();
-            let buffer_arc = Arc::new(Mutex::new(buffer));
-            let buffer_clone = buffer_arc.clone();
-            let mut server = Server::new(ip, peers, buffer_clone).await?;
-            let _ = server.init().await;
             Ok(Node {
                 id: Uuid::new_v4(),
                 key_pair,
                 rng,
-                server,
+                peers,
             })
             
         }

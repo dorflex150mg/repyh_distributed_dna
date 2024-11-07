@@ -76,28 +76,23 @@ impl DbHandle {
     //    })
     //}
 
-    pub fn push_dna_sequence(&self, id: String) -> Result<String, rusqlite::Error> {
+    pub fn push_dna_sequence(&self, dna_sequence: &DnaSequence) -> Result<String, rusqlite::Error> {
         self.connection.execute(
-            &format!("INSERT INTO dna_sequence(id) VALUES(\"{}\")", id.clone()),
+            &format!("INSERT OR REPLACE INTO dna_sequence(id, dna_sequence) VALUES(\"{}\", \"{}\")", dna_sequence.id.clone(), dna_sequence.dna_sequence),
             [],
         )?;
-        Ok(id)
+        Ok(dna_sequence.id.clone())
     }
         
-    pub fn get_dna_sequences(&self) -> Result<Vec<DnaSequence>, QuerryError> {
-        let mut query = self.connection.prepare("SELECT id, dna_sequence FROM dna_sequence")?;
-        let dna_sequences_iter = query.query_map([], |row| {
-            Ok(DnaSequence {
-                id: row.get(0)?,
-                dna_sequence: row.get(1)?
-              })
-        })?;
-        let mut dna_sequences: Vec<DnaSequence> = vec![];
-        for maybe_dna_sequence in dna_sequences_iter {
-            let dna_sequence = maybe_dna_sequence.or(Err(EmptyTableError::NoDnaSequences))?;
-            dna_sequences.push(dna_sequence);
-        }
-        Ok(dna_sequences)
+    pub fn get_dna_sequence(&self, id: String) -> Result<DnaSequence, QuerryError> {
+        let mut query = self.connection.prepare("SELECT id, dna_sequence FROM dna_sequence WHERE id = ?1;")?;
+        let mut rows = query.query(rusqlite::params![id])?;
+        let maybe_row = rows.next()?;
+        let row = maybe_row.ok_or(EmptyTableError::NoDnaSequences)?;
+        Ok(DnaSequence {
+            id: row.get(0)?,
+            dna_sequence: row.get(1)?
+        })
     }
 }
 
