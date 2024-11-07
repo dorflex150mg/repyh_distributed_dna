@@ -30,7 +30,7 @@ impl fmt::Display for EmptyTableError {
 
 fn create_tables(connection: Connection) -> Result<Connection, rusqlite::Error> {
     connection.execute(
-        "CREATE TABLE IF NOT EXISTS dna(
+        "CREATE TABLE IF NOT EXISTS dna_sequence(
             id TEXT PRIMARY KEY,
             dna_sequence TEXT
         );",

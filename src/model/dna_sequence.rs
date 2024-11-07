@@ -4,7 +4,7 @@ use std::fmt::{self, Display};
 
 #[derive(Serialize, Deserialize, Clone)]
 pub struct DnaSequence {
-    pub id: String,
+    pub id: String,//TODO: make private, create builder and "with_id" method
     pub dna_sequence: String,
 }
 
@@ -16,10 +16,10 @@ impl Display for DnaSequence {
         
 
 impl DnaSequence {
-    pub fn new(id: String, dna_sequence: String) -> Self { 
+    pub fn new(dna_sequence: String) -> Self { 
         let id = Uuid::new_v4().to_string();
         DnaSequence{
-            id,
+            id, 
             dna_sequence,
         }
     }

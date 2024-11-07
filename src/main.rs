@@ -5,16 +5,15 @@ pub mod sender;
 pub mod responses;
 
 use crate::node::node::Node;
-use crate::user::user::User;
 use std::error::Error;
 use std::fs::File;
 use std::io::Read;
+use std::env;
 
 
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
-use actix_web::{web, App, HttpResponse, HttpServer, Responder};
-use actix_rt;
+use actix_web::{web, App, HttpServer};
 use serde::{Serialize, Deserialize};
 
 use crate::repository::db::DbHandle;
@@ -27,22 +26,24 @@ mod model;
 
 
 use api::dna_sequence::{
-    create_dna_sequence,
-    get_dna_sequence,
+    dna,
+    insert_dna_sequence,
+    share_patch,
+    share_dna_sequence
+    
 };
 
 
 type Db = Arc<Mutex<DbHandle>>;
 
-//#[actix_web::get("/hello/{id}")]
-//async fn hello(user_id: web::Path<u64>) -> impl Responder { //formats from endpoint into Responder
-//    format!("Hello, {user_id}!")
-//}
-
-#[tokio::main]
-async fn  main() -> Result<(), Box<dyn Error>> {
+#[actix_web::main]
+async fn main() -> Result<(), Box<dyn Error>> {
+    //init_tracing();
+    println!("Starting");
     //Loading conf files with peer ips
-    let mut file = File::open("conf/ips0.json").unwrap();
+    let file_name = env::var("FILENAME").unwrap();
+    println!("filename: {}", &file_name);
+    let mut file = File::open(file_name).unwrap();
     let mut ips_str = String::new();
     file.read_to_string(&mut ips_str).unwrap();
     let json: Vec<Vec<String>> = serde_json::from_str(ips_str.as_ref()).unwrap();
@@ -51,20 +52,24 @@ async fn  main() -> Result<(), Box<dyn Error>> {
     let api_ip = ip_list[1].clone();
     let peers = json[1].clone();
     // Initializing a node
-    //let node = Node::new(ip, peers).await.unwrap();
     let responses: HashMap<String, Responses> = HashMap::new();
-    let addresses_arc = Arc::new(Mutex::new(peers));
+    //let addresses_arc = Arc::new(Mutex::new(peers));
     let responses_arc = Arc::new(Mutex::new(responses));
-
-
-    // Creating client-side service
-    let db: Db = Arc::new(Mutex::new(DbHandle::new(String::from("dna.db")).unwrap()));
+    //Creating client-side service
+    let db_name = env::var("DATABASE").unwrap();
+    println!("database: {}", db_name);
+    let db: Db = Arc::new(Mutex::new(DbHandle::new(String::from(db_name)).unwrap()));
+    println!("Listening on: {}", &api_ip);
     let _ = HttpServer::new(move || { 
         let db_handle = web::Data::new(db.clone()); //a struct that represents data
-        let addresses_data = web::Data::new(addresses_arc.clone()); 
+        let addresses_data = web::Data::new(peers.clone()); 
         let responses_data = web::Data::new(responses_arc.clone());
+        println!("Creating app...");
         App::new()
-            .service(get_dna_sequence)
+            .service(insert_dna_sequence)
+            .service(dna)
+            .service(share_patch)
+            .service(share_dna_sequence)
             .app_data(addresses_data)
             .app_data(responses_data)
             .app_data(db_handle) //enrolls data "type" into the app
@@ -72,30 +77,28 @@ async fn  main() -> Result<(), Box<dyn Error>> {
         .bind(api_ip)?
         .run()
         .await;
-    init_tracing();
-    loop {}
     Ok(())
 }
 
 
-pub fn init_tracing() {
-    use tracing::level_filters::LevelFilter;
-    use tracing_subscriber::prelude::*;
-    use tracing_subscriber::EnvFilter;
-
-    let env = EnvFilter::builder()
-        .with_default_directive(LevelFilter::DEBUG.into())
-        .with_env_var("RUST_LOG")
-        .from_env_lossy();
-
-    let fmt_layer = tracing_subscriber::fmt::layer()
-        .compact()
-        .with_file(true)
-        .with_line_number(true)
-        .with_thread_ids(false)
-        .with_target(false);
-    tracing_subscriber::registry()
-        .with(fmt_layer)
-        .with(env)
-        .init();
-}
+//pub fn init_tracing() {
+//    use tracing::level_filters::LevelFilter;
+//    use tracing_subscriber::prelude::*;
+//    use tracing_subscriber::EnvFilter;
+//
+//    let env = EnvFilter::builder()
+//        .with_default_directive(LevelFilter::DEBUG.into())
+//        .with_env_var("RUST_LOG")
+//        .from_env_lossy();
+//
+//    let fmt_layer = tracing_subscriber::fmt::layer()
+//        .compact()
+//        .with_file(true)
+//        .with_line_number(true)
+//        .with_thread_ids(false)
+//        .with_target(false);
+//    tracing_subscriber::registry()
+//        .with(fmt_layer)
+//        .with(env)
+//        .init();
+//}
