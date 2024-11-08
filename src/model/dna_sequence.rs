@@ -1,4 +1,3 @@
-use uuid::Uuid;
 use serde::{Serialize, Deserialize};
 use std::fmt::{self, Display};
 
@@ -16,8 +15,7 @@ impl Display for DnaSequence {
         
 
 impl DnaSequence {
-    pub fn new(dna_sequence: String) -> Self { 
-        let id = Uuid::new_v4().to_string();
+    pub fn new(id: String, dna_sequence: String) -> Self { 
         DnaSequence{
             id, 
             dna_sequence,

@@ -33,7 +33,7 @@ impl fmt::Display for EmptyTableError {
 
 fn create_tables(connection: Connection) -> Result<Connection, rusqlite::Error> {
     connection.execute(
-        "CREATE TABLE IF NOT EXISTS dna_sequence(
+        "CREATE TABLE IF NOT EXISTS DnaSequence( 
             id TEXT PRIMARY KEY,
             dna_sequence TEXT
         );",
@@ -59,37 +59,10 @@ impl DbHandle {
         })
     }
 
-    //pub fn push_item(&self, id: String, name: String, price: f64) -> Result<String, rusqlite::Error> {
-    //    let request = &format!("INSERT INTO item(id, name, price) VALUES(\"{}\", \"{}\", {});",
-    //            id.clone(),
-    //            name,
-    //            price,
-    //        );
-    //    println!("request:{request}");
-    //    
-    //    self.connection.execute(request,
-    //        [],
-    //    )?;
-    //    Ok(id)
-    //}
-
-    //pub fn get_item(&self, id: String) -> Result<Item, QuerryError> {
-    //    println!("querying id: {}", id);
-    //    let mut query = self.connection.prepare("SELECT name, price FROM item WHERE id = ?1;")?;
-    //    let mut rows = query.query(rusqlite::params![id])?;
-    //    let maybe_row = rows.next()?;
-    //    let row = maybe_row.ok_or(EmptyTableError::NoItems)?;
-    //    Ok(Item {
-    //        id, 
-    //        name: row.get(0)?,
-    //        price: row.get(1)?,
-    //    })
-    //}
-
     pub fn push_dna_sequence(&self, dna_sequence: &DnaSequence) -> Result<String, rusqlite::Error> {
         self.connection.execute(
             &format!(
-                "INSERT OR REPLACE INTO dna_sequence(id, dna_sequence) VALUES(\"{}\", \"{}\")", 
+                "INSERT OR REPLACE INTO DnaSequence(id, dna_sequence) VALUES(\"{}\", \"{}\")", 
                 dna_sequence.id.clone(), 
                 dna_sequence.dna_sequence
             ),
@@ -100,7 +73,7 @@ impl DbHandle {
 
     pub fn push_public_key(&self, public_key: &PublicKey) -> Result<String, rusqlite::Error> {
         self.connection.execute(
-                "INSERT OR REPLACE INTO PublicKey(id, dna_sequence) VALUES(?1, ?2)", 
+                "INSERT OR REPLACE INTO PublicKey(id, public_key) VALUES(?1, ?2)", 
                 (public_key.id.clone(), 
                 public_key.public_key.clone())
         )?;
@@ -119,7 +92,7 @@ impl DbHandle {
     }
         
     pub fn get_dna_sequence(&self, id: String) -> Result<DnaSequence, QuerryError> {
-        let mut query = self.connection.prepare("SELECT id, dna_sequence FROM dna_sequence WHERE id = ?1;")?;
+        let mut query = self.connection.prepare("SELECT id, dna_sequence FROM DnaSequence WHERE id = ?1;")?;
         let mut rows = query.query(rusqlite::params![id])?;
         let maybe_row = rows.next()?;
         let row = maybe_row.ok_or(EmptyTableError::NoDnaSequences)?;

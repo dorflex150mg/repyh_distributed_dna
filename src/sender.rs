@@ -56,7 +56,6 @@ pub mod sender{
     pub async fn post_dna_sequence(ip: String, dna_sequence: DnaSequence, n_responses: Arc<Mutex<u32>>) -> Result<Response, String> {
         let base = URL_BASE.to_string() + ip.as_ref();
         let address = base + "/share_dna_sequence";
-        println!("posting dna sequence to {}", &address);
         let mut data = HashMap::new();
         data.insert("id", dna_sequence.id);
         data.insert("dna_sequence", dna_sequence.dna_sequence);
@@ -109,7 +108,7 @@ pub mod sender{
 
         let mut quorum = false; //this is to minimize the lock usage
         while !quorum {
-            tokio::time::sleep(Duration::from_millis(50)).await; //TODO: optimize. Wait/Notify?
+            sleep(Duration::from_millis(50)).await; //TODO: optimize. Wait/Notify?
             if *n_responses.lock().unwrap() <= BYZANTINE_THRESHOLD {
                 quorum = true;
             }
@@ -132,7 +131,7 @@ pub mod sender{
 
         let mut quorum = false; //this is to minimize the lock usage
         while !quorum {
-            tokio::time::sleep(Duration::from_millis(500)).await; //TODO: optimize. Wait/Notify?
+            sleep(Duration::from_millis(500)).await; //TODO: optimize. Wait/Notify?
             if *n_responses.lock().unwrap() <= BYZANTINE_THRESHOLD {
                 quorum = true;
             }

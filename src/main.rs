@@ -1,6 +1,3 @@
-pub mod node;
-pub mod user;
-pub mod server;
 pub mod sender;
 
 mod api;
@@ -15,7 +12,6 @@ use std::env;
 
 use std::sync::{Arc, Mutex};
 use actix_web::{web, App, HttpServer};
-use serde::{Serialize, Deserialize};
 
 use crate::repository::db::DbHandle;
 use tracing::{debug, info};
@@ -39,10 +35,8 @@ type Db = Arc<Mutex<DbHandle>>;
 #[actix_web::main]
 async fn main() -> Result<(), Box<dyn Error>> {
     //init_tracing();
-    println!("Starting");
     //Loading conf files with peer ips
     let file_name = env::var("FILENAME").unwrap();
-    println!("filename: {}", &file_name);
     let mut file = File::open(file_name).unwrap();
     let mut ips_str = String::new();
     file.read_to_string(&mut ips_str).unwrap();
@@ -53,13 +47,11 @@ async fn main() -> Result<(), Box<dyn Error>> {
     let peers = json[1].clone();
     //Creating client-side service
     let db_name = env::var("DATABASE").unwrap();
-    println!("database: {}", db_name);
     let db: Db = Arc::new(Mutex::new(DbHandle::new(String::from(db_name)).unwrap()));
     println!("Listening on: {}", &api_ip);
     let _ = HttpServer::new(move || { 
         let db_handle = web::Data::new(db.clone()); //a struct that represents data
         let addresses_data = web::Data::new(peers.clone()); 
-        println!("Creating app...");
         App::new()
             .service(insert_public_key)
             .service(share_public_key)
