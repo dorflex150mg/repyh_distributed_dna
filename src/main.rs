@@ -2,27 +2,23 @@ pub mod node;
 pub mod user;
 pub mod server;
 pub mod sender;
-pub mod responses;
 
-use crate::node::node::Node;
+mod api;
+mod repository;
+mod model;
+
 use std::error::Error;
 use std::fs::File;
 use std::io::Read;
 use std::env;
 
 
-use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 use actix_web::{web, App, HttpServer};
 use serde::{Serialize, Deserialize};
 
 use crate::repository::db::DbHandle;
-use crate::responses::responses::Responses;
 use tracing::{debug, info};
-
-mod api;
-mod repository;
-mod model;
 
 
 use api::dna_sequence::{
@@ -30,7 +26,11 @@ use api::dna_sequence::{
     insert_dna_sequence,
     share_patch,
     share_dna_sequence
-    
+};
+
+use api::public_key::{
+    insert_public_key,
+    share_public_key
 };
 
 
@@ -51,10 +51,6 @@ async fn main() -> Result<(), Box<dyn Error>> {
     let ip = ip_list[0].clone();
     let api_ip = ip_list[1].clone();
     let peers = json[1].clone();
-    // Initializing a node
-    let responses: HashMap<String, Responses> = HashMap::new();
-    //let addresses_arc = Arc::new(Mutex::new(peers));
-    let responses_arc = Arc::new(Mutex::new(responses));
     //Creating client-side service
     let db_name = env::var("DATABASE").unwrap();
     println!("database: {}", db_name);
@@ -63,16 +59,16 @@ async fn main() -> Result<(), Box<dyn Error>> {
     let _ = HttpServer::new(move || { 
         let db_handle = web::Data::new(db.clone()); //a struct that represents data
         let addresses_data = web::Data::new(peers.clone()); 
-        let responses_data = web::Data::new(responses_arc.clone());
         println!("Creating app...");
         App::new()
+            .service(insert_public_key)
+            .service(share_public_key)
             .service(insert_dna_sequence)
             .service(dna)
             .service(share_patch)
             .service(share_dna_sequence)
             .app_data(addresses_data)
-            .app_data(responses_data)
-            .app_data(db_handle) //enrolls data "type" into the app
+            .app_data(db_handle) 
     })
         .bind(api_ip)?
         .run()

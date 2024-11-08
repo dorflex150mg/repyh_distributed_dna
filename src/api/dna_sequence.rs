@@ -22,9 +22,10 @@ use serde::{Serialize, Deserialize};
 use crate::repository::db::DbHandle;
 use crate::repository::db::QuerryError;
 use crate::model::dna_sequence::DnaSequence;
+use crate::model::public_key::PublicKey;
+use crate::model::public_key::WrongSignatureError;
 use crate::sender::sender;
-use crate::node::node::Node;
-use crate::responses::responses::Responses;
+
 
 use tracing::{debug, info};
 
@@ -33,6 +34,7 @@ use tracing::{debug, info};
 pub enum DbDnaSequenceError {
     DnaSequenceNotFound(QuerryError),
     PushFailed(QuerryError),
+    SignatureVerificationFailed(WrongSignatureError),
 }
 
 impl ResponseError for DbDnaSequenceError {
@@ -71,6 +73,7 @@ struct Diff {
 pub struct SubmitDnaSequence {
     id: String,
     dna_sequence: String,
+    signature: String,
 }
 
 #[derive(Serialize, Deserialize, Clone)]
@@ -152,7 +155,6 @@ async fn share_dna_sequence(db: web::Data<Arc<Mutex<DbHandle>>>,
 
 #[actix_web::post("/insert_dna_sequence")]
 async fn insert_dna_sequence(db: web::Data<Arc<Mutex<DbHandle>>>,
-        //addresses: web::Data<Arc<Mutex<Vec<String>>>>,
         addresses: web::Data<Vec<String>>,
         request: Json<SubmitDnaSequence>,
         ) -> Result<Json<String>, DbDnaSequenceError> {
@@ -163,6 +165,9 @@ async fn insert_dna_sequence(db: web::Data<Arc<Mutex<DbHandle>>>,
     let reply_id = dna_sequence.id.clone();
     debug!("locking db");
     let db = db.lock().unwrap();
+    let public_key = db.get_public_key(&reply_id).unwrap();
+    PublicKey::check_signature(&request.signature.clone(), public_key, &dna_sequence.dna_sequence)
+        .map_err(DbDnaSequenceError::SignatureVerificationFailed)?;
     //if the sequence already exists, broadcast patches
     let _ = match db.get_dna_sequence(request.id.clone()) {
         Ok(old_sequence) => { 

@@ -4,4 +4,4 @@ for i in {0..4}; do
 	rm dna.db 
 	DATABASE="var/dna$i.db" FILENAME="conf/ips$i.json" cargo run &
 done
-docker run --net="host" -it ubuntu /bin/bash -c 'rm dna.db; FILENAME="conf/ips4.json" cargo run';
+#docker run --net="host" -it ubuntu /bin/bash -c 'rm dna.db; FILENAME="conf/ips4.json" cargo run';
