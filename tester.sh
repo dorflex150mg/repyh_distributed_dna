@@ -28,7 +28,7 @@ echo " "
 echo "Patch dna: "
 result=$(curl --header "Content-Type: application/json" \
 	--request POST \
-	--data '{"id":'$result', "dna_sequence":"TCCG"}' \
+	--data '{"id":'$result', "dna_sequence":"TCCG", "signature": "'$signature'"}' \
 	127.0.0.1:8082/insert_dna_sequence)
 echo "result: "$result
 echo "Get patched dna: "
@@ -36,4 +36,10 @@ curl --header "Content-Type: application/json" \
 	--request GET \
 	--data $data \
 	127.0.0.1:8082/dna
+echo " "
+echo "Get patched dna from another node: "
+curl --header "Content-Type: application/json" \
+	--request GET \
+	--data $data \
+	127.0.0.1:8083/dna
 echo " "

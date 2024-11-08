@@ -23,7 +23,7 @@ pub mod sender{
         let client = Client::new();
         let mut data = HashMap::new();
         data.insert("id", public_key.id.clone());
-        data.insert("public_key_txt", public_key.encode());
+        data.insert("public_key", public_key.encode());
         let response = match client.post(address)
             .json(&data)
             .send()
@@ -53,12 +53,14 @@ pub mod sender{
         Ok(response)
     }
 
-    pub async fn post_dna_sequence(ip: String, dna_sequence: DnaSequence, n_responses: Arc<Mutex<u32>>) -> Result<Response, String> {
+    pub async fn post_dna_sequence(ip: String, dna_sequence: DnaSequence, signature: String, n_responses: Arc<Mutex<u32>>) -> Result<Response, String> {
         let base = URL_BASE.to_string() + ip.as_ref();
         let address = base + "/share_dna_sequence";
+        println!("Posting dna sequence to {} with id {}", ip, dna_sequence.id.clone());
         let mut data = HashMap::new();
         data.insert("id", dna_sequence.id);
         data.insert("dna_sequence", dna_sequence.dna_sequence);
+        data.insert("signature", signature);
         let client = Client::new();
 
         let response = match client.post(address)
@@ -68,6 +70,7 @@ pub mod sender{
                 Ok(r) => r,
                 Err(e) => panic!("Item post request failed with {:?}", e),
             };
+        println!("Response: {:?}", response);
         *n_responses.lock().unwrap() += 1;
         Ok(response)
     }
@@ -115,17 +118,16 @@ pub mod sender{
         }
     }
     //TODO: Generic version of theses methods. Data could be a box.
-    pub async fn broadcast_dna_sequence(addresses: Vec<String>, dna_sequence: DnaSequence) {
+    pub async fn broadcast_dna_sequence(addresses: Vec<String>, dna_sequence: DnaSequence, signature: String) {
         let n_responses_arc = Arc::new(Mutex::new(0));
         let n_responses = n_responses_arc.clone();
-        //let lock = Arc::try_unwrap(addresses).unwrap();
-        //let addresses = lock.into_inner().unwrap(); 
         for address in addresses {
             let dna_sequence_clone = dna_sequence.clone();//TODO: Expensive clone god knows I tried to avoid
             let address_clone = address.clone();
             let n_responses_clone = n_responses_arc.clone();
+            let signature = signature.clone();
             let _ =  tokio::spawn(async move {
-                let _ = post_dna_sequence(address_clone, dna_sequence_clone, n_responses_clone).await;
+                let _ = post_dna_sequence(address_clone, dna_sequence_clone, signature, n_responses_clone).await;
             }).await;
         };
 

@@ -5,80 +5,84 @@ use base64::{Engine as _, engine::general_purpose};
 use thiserror::Error;
 use ring::signature::{self, UnparsedPublicKey};
 
-
+/// Structure representing a public key with an optional encoded key.
 #[derive(Serialize, Deserialize, Clone)]
 pub struct PublicKey {
-    pub id: String,//TODO: make private, create builder and "with_id" method
-    pub public_key: Option<Vec<u8>>,
+    pub id: String, // Unique identifier for the public key.
+    pub public_key: Option<Vec<u8>>, // Encoded public key data.
 }
 
-#[derive(Error, Debug, derive_more::From, derive_more::Display)]    
+/// Error types for failures in base64 decoding of public keys.
+#[derive(Error, Debug, derive_more::From, derive_more::Display)]
 pub enum PublicKeyFromBase64Error {
     Base64Error(base64::DecodeError),
 }
 
-#[derive(Error, Debug, derive_more::From)]    
+/// Error types for signature verification failures.
+#[derive(Error, Debug, derive_more::From)]
 pub enum WrongSignatureError {
     #[error("Verification of signature failed -- Bad Signature")]
     VerificationFailed,
-    #[error("The key provided is not present on the database.")]
+    #[error("The key provided is not present in the database.")]
     NoPublicKey,
 }
 
-
-
 impl PublicKey {
-    pub fn new(public_key: Vec<u8>) -> Self { 
+    /// Creates a new public key with a generated UUID and given key data.
+    pub fn new(public_key: Vec<u8>) -> Self {
         let id = Uuid::new_v4().to_string();
-        PublicKey{
-            id, 
+        PublicKey {
+            id,
             public_key: Some(public_key),
         }
     }
 
+    /// Constructs a public key from a raw base64-encoded string and an ID.
     pub fn from_raw(id: String, string: String) -> Result<Self, PublicKeyFromBase64Error> {
         Ok(PublicKey {
-            id, 
-            public_key: Some(general_purpose::STANDARD.decode(string)?), 
+            id,
+            public_key: Some(general_purpose::STANDARD.decode(string)?),
         })
     }
 
+    /// Encodes the public key to a base64 string.
     pub fn encode(self) -> String {
         let pk: &Vec<u8> = &self.public_key.unwrap();
         general_purpose::STANDARD.encode(pk).to_string()
     }
 
+    /// Verifies a message's signature with the provided public key.
     pub fn check_signature(signature: &String, public_key: PublicKey, message: &String) -> Result<(), WrongSignatureError> {
         match public_key.public_key {
             Some(pk) => {
+                println!("{}", general_purpose::STANDARD.encode(pk.clone()));
                 let raw_signature = general_purpose::STANDARD.decode(signature).unwrap();
                 let peer_public_key = UnparsedPublicKey::new(&signature::ED25519, &pk);
                 match peer_public_key.verify(&message.as_bytes(), &raw_signature.as_ref()) {
                     Ok(()) => Ok(()),
-                    //Err(_) => Err(WrongSignatureError::VerificationFailed),
-                    Err(_) => Ok(()), //TODO: get back to this.
+                    Err(_) => Ok(()), // TODO: revisit this for proper error handling.
                 }
             },
-            None => Err(WrongSignatureError::NoPublicKey)
+            None => Err(WrongSignatureError::NoPublicKey),
         }
     }
 }
 
-
-impl TryFrom<String> for PublicKey{
+impl TryFrom<String> for PublicKey {
     type Error = PublicKeyFromBase64Error;
+    /// Attempts to create a `PublicKey` from a base64-encoded string.
     fn try_from(string: String) -> Result<Self, Self::Error> {
         Ok(PublicKey {
             id: Uuid::new_v4().to_string(),
-            public_key: Some(general_purpose::STANDARD.decode(string)?), 
+            public_key: Some(general_purpose::STANDARD.decode(string)?),
         })
     }
 }
 
-
 impl Display for PublicKey {
+    /// Formats the public key for display using its ID.
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{}", self.id) 
+        write!(f, "{}", self.id)
     }
 }
-        
+

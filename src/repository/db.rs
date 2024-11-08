@@ -5,17 +5,20 @@ use thiserror::Error;
 use crate::model::dna_sequence::DnaSequence;
 use crate::model::public_key::PublicKey;
 
+/// Database handle for managing DNA sequences and public keys.
 pub struct DbHandle {
     connection: Connection,
     name: String,
 }
 
+/// Errors that can occur during database queries.
 #[derive(Error, Debug, derive_more::From, derive_more::Display)]
 pub enum QuerryError {
     RusqliteError(rusqlite::Error),
     EmptyTableErrorW(EmptyTableError),
 }
 
+/// Errors indicating missing entries in tables.
 #[derive(Error, Debug)]
 pub enum EmptyTableError {
     NoDnaSequences,
@@ -31,6 +34,7 @@ impl fmt::Display for EmptyTableError {
     }
 }
 
+/// Initializes database tables if they do not already exist.
 fn create_tables(connection: Connection) -> Result<Connection, rusqlite::Error> {
     connection.execute(
         "CREATE TABLE IF NOT EXISTS DnaSequence( 
@@ -50,20 +54,19 @@ fn create_tables(connection: Connection) -> Result<Connection, rusqlite::Error> 
 }
 
 impl DbHandle {
+    /// Creates a new `DbHandle` instance and initializes database tables.
     pub fn new(name: String) -> Result<Self, rusqlite::Error> {
         let mut connection = Connection::open(&name)?;
         connection = create_tables(connection)?;
-        Ok(DbHandle {
-            connection,
-            name,
-        })
+        Ok(DbHandle { connection, name })
     }
 
+    /// Inserts or updates a DNA sequence in the database.
     pub fn push_dna_sequence(&self, dna_sequence: &DnaSequence) -> Result<String, rusqlite::Error> {
         self.connection.execute(
             &format!(
-                "INSERT OR REPLACE INTO DnaSequence(id, dna_sequence) VALUES(\"{}\", \"{}\")", 
-                dna_sequence.id.clone(), 
+                "INSERT OR REPLACE INTO DnaSequence(id, dna_sequence) VALUES(\"{}\", \"{}\")",
+                dna_sequence.id.clone(),
                 dna_sequence.dna_sequence
             ),
             [],
@@ -71,15 +74,16 @@ impl DbHandle {
         Ok(dna_sequence.id.clone())
     }
 
+    /// Inserts or updates a public key in the database.
     pub fn push_public_key(&self, public_key: &PublicKey) -> Result<String, rusqlite::Error> {
         self.connection.execute(
-                "INSERT OR REPLACE INTO PublicKey(id, public_key) VALUES(?1, ?2)", 
-                (public_key.id.clone(), 
-                public_key.public_key.clone())
+            "INSERT OR REPLACE INTO PublicKey(id, public_key) VALUES(?1, ?2)",
+            (public_key.id.clone(), public_key.public_key.clone())
         )?;
         Ok(public_key.id.clone())
     }
 
+    /// Retrieves a public key by ID.
     pub fn get_public_key(&self, id: &String) -> Result<PublicKey, QuerryError> {
         let mut query = self.connection.prepare("SELECT id, public_key FROM PublicKey WHERE id = ?1;")?;
         let mut rows = query.query(rusqlite::params![id])?;
@@ -90,7 +94,8 @@ impl DbHandle {
             public_key: row.get(1)?
         })
     }
-        
+
+    /// Retrieves a DNA sequence by ID.
     pub fn get_dna_sequence(&self, id: String) -> Result<DnaSequence, QuerryError> {
         let mut query = self.connection.prepare("SELECT id, dna_sequence FROM DnaSequence WHERE id = ?1;")?;
         let mut rows = query.query(rusqlite::params![id])?;
@@ -102,6 +107,4 @@ impl DbHandle {
         })
     }
 }
-
-    
 
