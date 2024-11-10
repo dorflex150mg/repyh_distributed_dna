@@ -1,6 +1,7 @@
 use std::fmt::{self, Display};
 use std::sync::Arc;
 use uuid::Uuid;
+use tracing::{debug, info};
 use serde::{Serialize, Deserialize};
 use base64::{Engine as _, engine::general_purpose};
 use thiserror::Error;
@@ -57,10 +58,14 @@ impl PublicKey {
         match public_key.public_key {
             Some(pk) => {
                 let raw_signature = general_purpose::STANDARD.decode(signature.to_string()).unwrap();
-                let peer_public_key = UnparsedPublicKey::new(&signature::ED25519, &pk);
+                let peer_public_key = UnparsedPublicKey::new(&signature::ED25519, pk);
                 match peer_public_key.verify(&message.as_bytes(), &raw_signature.as_ref()) {
                     Ok(()) => Ok(()),
-                    Err(_) => Ok(()), // TODO: revisit this for proper error handling.
+                    //Err(_) => Ok(()), // TODO: revisit this for proper error handling.
+                    Err(e) => {
+                        debug!("VERIFICATION FAILED!: {}", e);
+                        Err(WrongSignatureError::VerificationFailed) 
+                    },
                 }
             },
             None => Err(WrongSignatureError::NoPublicKey),

@@ -36,6 +36,8 @@ async fn main() {
     info!("Dna sequence get response: {:?}", dna_get_response);
 
     dna_client.set_dna_sequence("TCCG");
+    let signature = dna_client.sign();
+
     let patch_response = client_sender::post_dna_sequence(IP, id.clone(), dna_client.dna_sequence.clone(), signature).await.unwrap();
     info!("Dna patch post response: {:?}", patch_response);
 

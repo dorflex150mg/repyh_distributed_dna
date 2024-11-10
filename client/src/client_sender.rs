@@ -13,8 +13,10 @@ pub async fn post_public_key(ip: &str, public_key: Vec<u8>) -> Result<Response, 
     let address = ip.to_string() + "/insert_public_key";
     let client = Client::new();
     let mut data = HashMap::new();
+    let pk = encode(public_key);
+    println!("public key: {}", pk);
     data.insert("id", "".to_string());
-    data.insert("public_key", encode(public_key));
+    data.insert("public_key", pk);
 
     let response = match client.post(address)
         .json(&data)
