@@ -126,6 +126,7 @@ async fn insert_dna_sequence(
     debug!("Creating dna sequence");
     let dna_sequence_raw = request.dna_sequence.clone();
     let id = request.id.clone();
+    debug!("id: {}", &id);
     let signature = request.signature.clone();
     let mut dna_sequence = DnaSequence::new(id.clone(), dna_sequence_raw.clone());
     debug!("locking db");
@@ -136,6 +137,7 @@ async fn insert_dna_sequence(
 
     let _ = match db.get_dna_sequence(request.id.clone()) { 
         Ok(old_sequence) => { 
+            debug!("Existing sequence found");
             dna_sequence.id = old_sequence.id.clone();
 
             // Sending patches
