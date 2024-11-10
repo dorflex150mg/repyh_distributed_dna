@@ -46,7 +46,7 @@ async fn share_public_key(
     let id = request.id.clone();
     let public_key = PublicKey::from_raw(id, public_key_encoded).unwrap();
     match db.push_public_key(&public_key) {
-        Ok(id) => Ok(Json(id)),
+        Ok(id) => Ok(Json(id.to_string())),
         Err(e) => Err(DbPublicKeyError::PushFailed(QuerryError::RusqliteError(e))),
     }
 }
@@ -61,10 +61,9 @@ async fn insert_public_key(
     debug!("Creating public key");
     let public_key_encoded = request.public_key.clone();
     let public_key = PublicKey::try_from(public_key_encoded).unwrap();
-    let reply_id = public_key.id.clone();
+    let id = public_key.id.clone();
     debug!("locking db");
     let db = db.lock().unwrap();
-
     match db.push_public_key(&public_key) {
         Ok(_) => {
             debug!("inserting new pk");
@@ -74,6 +73,6 @@ async fn insert_public_key(
         },
         Err(e) => return Err(DbPublicKeyError::PushFailed(QuerryError::RusqliteError(e))),
     };
-    Ok(Json(reply_id))
+    Ok(Json(id.to_string()))
 }
 

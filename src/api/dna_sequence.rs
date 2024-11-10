@@ -1,22 +1,26 @@
+use crate::{
+    model::{
+        public_key::{PublicKey, WrongSignatureError},
+        dna_sequence::DnaSequence,
+        patch::Patch,
+    },
+    repository::db::{DbHandle, QuerryError},
+    sender::sender,
+};
+
+use std::sync::{Arc, Mutex};
+
+use serde::{Serialize, Deserialize};
+use tracing::{debug, info};
+use diff_match_patch_rs::{DiffMatchPatch, Efficient, PatchInput};
+use thiserror::Error;
 use actix_web::{
+    http::header::ContentType,
     error::ResponseError,
     web::Json,
     HttpResponse,
     web,
 };
-
-use std::sync::{Arc, Mutex};
-use diff_match_patch_rs::{DiffMatchPatch, Efficient, PatchInput};
-use thiserror::Error;
-use actix_web::http::header::ContentType;
-use serde::{Serialize, Deserialize};
-use crate::repository::db::DbHandle;
-use crate::repository::db::QuerryError;
-use crate::model::dna_sequence::DnaSequence;
-use crate::model::public_key::PublicKey;
-use crate::model::public_key::WrongSignatureError;
-use crate::sender::sender;
-use tracing::{debug, info};
 
 /// Errors for DNA sequence operations.
 #[derive(Debug, Error, derive_more::Display)]
@@ -44,22 +48,16 @@ struct GetDnaSequencesResponse {
 /// Request structure for submitting a new DNA sequence.
 #[derive(Deserialize)]
 pub struct SubmitDnaSequence { 
-    id: String,
-    dna_sequence: String,
-    signature: String,
+    id: Arc<str>,
+    dna_sequence: Arc<str>,
+    signature: Arc<str>,
 }
 
-/// Structure for DNA sequence patch data.
-#[derive(Serialize, Deserialize, Clone)]
-pub struct Patch { 
-    pub id: String,
-    pub patch_txt: String,
-}
 
 /// Structure for user ID in requests.
 #[derive(Deserialize)]
 pub struct UserId { 
-    id: String,
+    id: Arc<str>,
 }
 
 /// Handler for retrieving DNA sequences by ID.
@@ -71,7 +69,7 @@ async fn dna(
     let id = request.id.clone();
     let db = db.lock().unwrap();
     match db.get_dna_sequence(id) { 
-        Ok(read_seq) => Ok(Json(GetDnaSequencesResponse { dna_sequence: read_seq.dna_sequence })),
+        Ok(read_seq) => Ok(Json(GetDnaSequencesResponse { dna_sequence: read_seq.dna_sequence.to_string() })),
         Err(e) => Err(DbDnaSequenceError::DnaSequenceNotFound(e)),
     } 
 }
@@ -85,21 +83,19 @@ async fn share_patch(
     let patch = request.patch_txt.clone();
     let id = request.id.clone();
     let db = db.lock().unwrap();
-    let dna_sequence = db.get_dna_sequence(id).expect("Error -- No dna sequence with given id");
-
+    let dna_sequence = db.get_dna_sequence(id.clone()).expect("Error -- No dna sequence with given id");
     let dmp = DiffMatchPatch::new();
     let patches = dmp.patch_from_text::<Efficient>(patch.as_ref()).unwrap();
-    let (patched_sequence, ops) = dmp.patch_apply(&patches, dna_sequence.dna_sequence.as_ref()).unwrap();
+    let (patched_sequence_str, ops) = dmp.patch_apply(&patches, dna_sequence.dna_sequence.as_ref()).unwrap();
+    let patched_sequence: Arc<str> = patched_sequence_str.into();
     let mut success = true;
     ops.iter().for_each(|&o| success = success && o);
     if !success { 
         return Err(DbDnaSequenceError::PatchFailed);
     } 
-
-    let reply_id = dna_sequence.id.clone();
-    let new_sequence = DnaSequence { id: reply_id.clone(), dna_sequence: patched_sequence };
+    let new_sequence = DnaSequence::new(id.clone(), patched_sequence.clone());
     match db.push_dna_sequence(&new_sequence) { 
-        Ok(id) => Ok(Json(reply_id)),
+        Ok(id) => Ok(Json(id.clone().to_string())),
         Err(e) => Err(DbDnaSequenceError::PushFailed(QuerryError::RusqliteError(e))),
     } 
 }
@@ -110,15 +106,12 @@ async fn share_dna_sequence(
     db: web::Data<Arc<Mutex<DbHandle>>>,
     request: Json<SubmitDnaSequence>,
 ) -> Result<Json<String>, DbDnaSequenceError> { 
-    println!("Storing dna with id: {}", request.id.clone());
-    let db = db.lock().unwrap();
     let dna_sequence_raw = request.dna_sequence.clone();
     let id = request.id.clone();
-    let mut dna_sequence = DnaSequence::new(id, dna_sequence_raw);
-    dna_sequence.id = request.id.clone();
-    let reply_id = dna_sequence.id.clone();
+    let db = db.lock().unwrap();
+    let dna_sequence = DnaSequence::new(id, dna_sequence_raw);
     match db.push_dna_sequence(&dna_sequence) { 
-        Ok(id) => Ok(Json(reply_id)),
+        Ok(id) => Ok(Json(id.to_string())),
         Err(e) => Err(DbDnaSequenceError::PushFailed(QuerryError::RusqliteError(e))),
     } 
 }
@@ -133,26 +126,29 @@ async fn insert_dna_sequence(
     debug!("Creating dna sequence");
     let dna_sequence_raw = request.dna_sequence.clone();
     let id = request.id.clone();
-    let mut dna_sequence = DnaSequence::new(id, dna_sequence_raw);
-    let reply_id = dna_sequence.id.clone();
+    let signature = request.signature.clone();
+    let mut dna_sequence = DnaSequence::new(id.clone(), dna_sequence_raw.clone());
     debug!("locking db");
     let db = db.lock().unwrap();
-    let public_key = db.get_public_key(&reply_id).unwrap();
-    PublicKey::check_signature(&request.signature.clone(), public_key, &dna_sequence.dna_sequence)
+    let public_key = db.get_public_key(id.clone()).unwrap();
+    PublicKey::check_signature(signature.clone(), public_key, dna_sequence_raw.clone())
         .map_err(DbDnaSequenceError::SignatureVerificationFailed)?;
 
-    let sig_clone = request.signature.clone();
     let _ = match db.get_dna_sequence(request.id.clone()) { 
         Ok(old_sequence) => { 
-            println!("Updating sequence");
             dna_sequence.id = old_sequence.id.clone();
+
+            // Sending patches
             let dmp = DiffMatchPatch::new();
-            let diffs = dmp.diff_main::<Efficient>(old_sequence.dna_sequence.as_ref(), request.dna_sequence.as_ref()).unwrap();
+            let diffs = dmp.diff_main::<Efficient>(
+                old_sequence.dna_sequence.as_ref(), 
+                request.dna_sequence.as_ref()
+            ).unwrap();
             let patches = dmp.patch_make(PatchInput::new_diffs(&diffs)).unwrap();
-            let patch_txt = dmp.patch_to_text(&patches);
+            let patch_txt: Arc<str> = dmp.patch_to_text(&patches).into();
             match db.push_dna_sequence(&dna_sequence) { 
                 Ok(id) => { 
-                    let patch = Patch {id, patch_txt};
+                    let patch = Patch::new(id, patch_txt);
                     let _ = tokio::spawn(async move { 
                         sender::broadcast_patch(addresses.as_ref().to_owned(), patch).await; 
                     }).await;
@@ -162,12 +158,12 @@ async fn insert_dna_sequence(
             Some(old_sequence)
         },
         Err(_) => { 
-            println!("Pushing new sequence");
+            info!("Pushing new sequence");
             match db.push_dna_sequence(&dna_sequence) { 
                 Ok(_) => { 
                     debug!("inserting new sequence");
                     let _ = tokio::spawn(async move { 
-                        sender::broadcast_dna_sequence(addresses.as_ref().to_owned(), dna_sequence, sig_clone).await; 
+                        sender::broadcast_dna_sequence(addresses.as_ref().to_owned(), dna_sequence, signature).await; 
                     }).await;
                 },
                 Err(e) => return Err(DbDnaSequenceError::PushFailed(QuerryError::RusqliteError(e))),
@@ -175,6 +171,7 @@ async fn insert_dna_sequence(
             None
         }
     };
-    Ok(Json(reply_id))
+    Ok(Json(id.clone().to_string()))
+
 }
 
