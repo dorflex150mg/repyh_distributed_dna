@@ -1,11 +1,12 @@
+use std::sync::Arc;
 use serde::{Serialize, Deserialize};
 use std::fmt::{self, Display};
 
 /// Structure representing a DNA sequence.
 #[derive(Serialize, Deserialize, Clone)]
 pub struct DnaSequence {
-    pub id: String, // Unique identifier for the DNA sequence.
-    pub dna_sequence: String, // The DNA sequence data.
+    pub id: Arc<str>, // Unique identifier for the DNA sequence.
+    pub dna_sequence: Arc<str>, // The DNA sequence data.
 }
 
 impl Display for DnaSequence {
@@ -17,7 +18,7 @@ impl Display for DnaSequence {
 
 impl DnaSequence {
     /// Creates a new DNA sequence with the given ID and sequence data.
-    pub fn new(id: String, dna_sequence: String) -> Self {
+    pub fn new(id: Arc<str>, dna_sequence: Arc<str>) -> Self {
         DnaSequence {
             id,
             dna_sequence,

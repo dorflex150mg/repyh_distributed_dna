@@ -1,13 +1,16 @@
 pub mod sender{
 
-    use std::collections::HashMap;
-    use std::sync::{Arc, Mutex};
-    use reqwest::Client;
-    use reqwest::Response;
+    use crate::model::{
+        dna_sequence::DnaSequence,
+        public_key::PublicKey,
+        patch::Patch,
+    };
+    use std::{
+        sync::{Arc, Mutex},
+        collections::HashMap,
+    };
+    use reqwest::{Client, Response};
     use tokio::time::{sleep, Duration};
-    use crate::model::dna_sequence::DnaSequence;
-    use crate::model::public_key::PublicKey;
-    use crate::api::dna_sequence::Patch;
 
 
     const N_PEERS: u32 = 5;
@@ -16,14 +19,20 @@ pub mod sender{
     const URL_BASE: &str = "http://";
 
 
-
-    pub async fn post_public_key(ip: String, public_key: PublicKey, n_responses: Arc<Mutex<u32>>) -> Result<Response, String> {
+    pub async fn post_public_key(
+        ip: String, 
+        public_key: PublicKey, 
+        n_responses: Arc<Mutex<u32>>
+    ) -> Result<Response, String> {
         let base = URL_BASE.to_string() + ip.as_ref();
         let address = base + "/share_public_key";
         let client = Client::new();
-        let mut data = HashMap::new();
-        data.insert("id", public_key.id.clone());
-        data.insert("public_key", public_key.encode());
+        let id = public_key.id.clone();
+        let encoded_key: Arc<str> = public_key.encode().into();
+        let data = HashMap::from([
+            ("id", id),
+            ("public_key", encoded_key),
+        ]);
         let response = match client.post(address)
             .json(&data)
             .send()
@@ -35,13 +44,20 @@ pub mod sender{
         Ok(response)
     }
 
-    pub async fn post_patch(ip: String, patch: Patch, n_responses: Arc<Mutex<u32>>) -> Result<Response, String> {
+    pub async fn post_patch(
+        ip: String, 
+        patch: Patch, 
+        signature: Arc<str>,
+        n_responses: Arc<Mutex<u32>>
+    ) -> Result<Response, String> {
         let base = URL_BASE.to_string() + ip.as_ref();
         let address = base + "/share_patch";
         let client = Client::new();
-        let mut data = HashMap::new();
-        data.insert("id", patch.id);
-        data.insert("patch_txt", patch.patch_txt);
+        let data = HashMap::from([
+            ("id", patch.id),
+            ("patch_txt", patch.patch_txt),
+            ("signature", signature),
+        ]);
         let response = match client.post(address)
             .json(&data)
             .send()
@@ -53,14 +69,20 @@ pub mod sender{
         Ok(response)
     }
 
-    pub async fn post_dna_sequence(ip: String, dna_sequence: DnaSequence, signature: String, n_responses: Arc<Mutex<u32>>) -> Result<Response, String> {
+    pub async fn post_dna_sequence(
+        ip: String, 
+        dna_sequence: DnaSequence, 
+        signature: Arc<str>, 
+        n_responses: Arc<Mutex<u32>>
+    ) -> Result<Response, String> {
         let base = URL_BASE.to_string() + ip.as_ref();
         let address = base + "/share_dna_sequence";
         println!("Posting dna sequence to {} with id {}", ip, dna_sequence.id.clone());
-        let mut data = HashMap::new();
-        data.insert("id", dna_sequence.id);
-        data.insert("dna_sequence", dna_sequence.dna_sequence);
-        data.insert("signature", signature);
+        let data = HashMap::from([
+            ("id", dna_sequence.id),
+            ("dna_sequence", dna_sequence.dna_sequence),
+            ("signature", signature),
+        ]);
         let client = Client::new();
 
         let response = match client.post(address)
@@ -97,15 +119,17 @@ pub mod sender{
     }
 
     //TODO: Generic version of theses methods. Data could be a box.
-    pub async fn broadcast_patch(addresses: Vec<String>, patch: Patch) {
+    //Would probably require reflection.
+    pub async fn broadcast_patch(addresses: Vec<String>, signature: Arc<str>, patch: Patch) {
         let n_responses_arc = Arc::new(Mutex::new(0));
         let n_responses = n_responses_arc.clone();
         for address in addresses {
             let patch_clone = patch.clone();//TODO: Expensive clone god knows I tried to avoid
             let address_clone = address.clone();
+            let signature_clone = signature.clone();
             let n_responses_clone = n_responses_arc.clone();
             let _ =  tokio::spawn(async move {
-                let _ = post_patch(address_clone, patch_clone, n_responses_clone).await;
+                let _ = post_patch(address_clone, patch_clone, signature_clone, n_responses_clone).await;
             }).await;
         };
 
@@ -118,7 +142,7 @@ pub mod sender{
         }
     }
     //TODO: Generic version of theses methods. Data could be a box.
-    pub async fn broadcast_dna_sequence(addresses: Vec<String>, dna_sequence: DnaSequence, signature: String) {
+    pub async fn broadcast_dna_sequence(addresses: Vec<String>, dna_sequence: DnaSequence, signature: Arc<str>) {
         let n_responses_arc = Arc::new(Mutex::new(0));
         let n_responses = n_responses_arc.clone();
         for address in addresses {
@@ -139,7 +163,6 @@ pub mod sender{
             }
         }
     }
-
 
 }
     
