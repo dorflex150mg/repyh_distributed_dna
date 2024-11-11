@@ -47,6 +47,7 @@ pub mod sender{
     pub async fn post_patch(
         ip: String, 
         patch: Patch, 
+        signature: Arc<str>,
         n_responses: Arc<Mutex<u32>>
     ) -> Result<Response, String> {
         let base = URL_BASE.to_string() + ip.as_ref();
@@ -55,6 +56,7 @@ pub mod sender{
         let data = HashMap::from([
             ("id", patch.id),
             ("patch_txt", patch.patch_txt),
+            ("signature", signature),
         ]);
         let response = match client.post(address)
             .json(&data)
@@ -118,15 +120,16 @@ pub mod sender{
 
     //TODO: Generic version of theses methods. Data could be a box.
     //Would probably require reflection.
-    pub async fn broadcast_patch(addresses: Vec<String>, patch: Patch) {
+    pub async fn broadcast_patch(addresses: Vec<String>, signature: Arc<str>, patch: Patch) {
         let n_responses_arc = Arc::new(Mutex::new(0));
         let n_responses = n_responses_arc.clone();
         for address in addresses {
             let patch_clone = patch.clone();//TODO: Expensive clone god knows I tried to avoid
             let address_clone = address.clone();
+            let signature_clone = signature.clone();
             let n_responses_clone = n_responses_arc.clone();
             let _ =  tokio::spawn(async move {
-                let _ = post_patch(address_clone, patch_clone, n_responses_clone).await;
+                let _ = post_patch(address_clone, patch_clone, signature_clone, n_responses_clone).await;
             }).await;
         };
 
