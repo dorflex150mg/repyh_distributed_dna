@@ -27,11 +27,12 @@ pub mod sender{
         let base = URL_BASE.to_string() + ip.as_ref();
         let address = base + "/share_public_key";
         let client = Client::new();
-        let mut data = HashMap::new();
         let id = public_key.id.clone();
         let encoded_key: Arc<str> = public_key.encode().into();
-        data.insert("id", id);
-        data.insert("public_key", encoded_key);
+        let data = HashMap::from([
+            ("id", id),
+            ("public_key", encoded_key),
+        ]);
         let response = match client.post(address)
             .json(&data)
             .send()
@@ -51,9 +52,10 @@ pub mod sender{
         let base = URL_BASE.to_string() + ip.as_ref();
         let address = base + "/share_patch";
         let client = Client::new();
-        let mut data = HashMap::new();
-        data.insert("id", patch.id);
-        data.insert("patch_txt", patch.patch_txt);
+        let data = HashMap::from([
+            ("id", patch.id),
+            ("patch_txt", patch.patch_txt),
+        ]);
         let response = match client.post(address)
             .json(&data)
             .send()
@@ -74,10 +76,11 @@ pub mod sender{
         let base = URL_BASE.to_string() + ip.as_ref();
         let address = base + "/share_dna_sequence";
         println!("Posting dna sequence to {} with id {}", ip, dna_sequence.id.clone());
-        let mut data = HashMap::new();
-        data.insert("id", dna_sequence.id);
-        data.insert("dna_sequence", dna_sequence.dna_sequence);
-        data.insert("signature", signature);
+        let data = HashMap::from([
+            ("id", dna_sequence.id),
+            ("dna_sequence", dna_sequence.dna_sequence),
+            ("signature", signature),
+        ]);
         let client = Client::new();
 
         let response = match client.post(address)
@@ -114,6 +117,7 @@ pub mod sender{
     }
 
     //TODO: Generic version of theses methods. Data could be a box.
+    //Would probably require reflection.
     pub async fn broadcast_patch(addresses: Vec<String>, patch: Patch) {
         let n_responses_arc = Arc::new(Mutex::new(0));
         let n_responses = n_responses_arc.clone();
