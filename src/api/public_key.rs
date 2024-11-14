@@ -11,7 +11,7 @@ use serde::Deserialize;
 use crate::repository::db::DbHandle;
 use crate::repository::db::QuerryError;
 use crate::model::public_key::PublicKey;
-use crate::sender::sender;
+use crate::sender;
 use tracing::{debug, info};
 
 /// Errors for public key operations.

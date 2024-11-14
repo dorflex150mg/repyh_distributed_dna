@@ -5,7 +5,7 @@ use crate::{
         patch::Patch,
     },
     repository::db::{DbHandle, QuerryError},
-    sender::sender,
+    sender,
 };
 
 use std::sync::{Arc, Mutex};
@@ -177,7 +177,9 @@ async fn insert_dna_sequence(
             let patches = dmp.patch_make(PatchInput::new_diffs(&diffs)).unwrap();
             let patch_txt: Arc<str> = dmp.patch_to_text(&patches).into();
 
-            match db.push_dna_sequence(&dna_sequence) { 
+            let res = db.push_dna_sequence(&dna_sequence); 
+            drop(db);
+            match res {
                 Ok(id) => { 
                     let patch = Patch::new(id, patch_txt);
                     let _ = tokio::spawn(async move { 
