@@ -10,6 +10,7 @@ use std::{
 use reqwest::{Client, Response};
 use tokio::time::{sleep, Duration};
 use futures::future::join_all;
+use tracing::info;
 
 
 const N_PEERS: u32 = 5;
@@ -172,13 +173,16 @@ pub async fn broadcast_dna_sequence(addresses: Vec<String>, dna_sequence: DnaSeq
             }
         }
     });
-    let _ = tokio::spawn(async move {
-        select!{
-            counter, 
-            threads
-        };
-    }).await;
+    tokio::select!{
+        _val = counter => {
+            info!("Counter completed");
+        }
+        _val = threads => {
+            info!("Shouldn't really happen");
+        }
+    };
 }
+
 
 
     
